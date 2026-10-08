@@ -98,7 +98,9 @@ docker compose up --build -d
 ./scripts/demo.sh          # happy path + compensation path end to end
 ```
 
-Or by hand:
+On Windows, run `scripts/demo.sh` and the commands below from Git Bash or WSL. Of the application services, only the gateway is published on the host (port 8080); Postgres (5432), Kafka (29092) and Redis (6379) are also exposed for local debugging.
+
+Or by hand (the example uses `jq`):
 
 ```bash
 TOKEN=$(curl -s -X POST localhost:8080/auth/token -H 'Content-Type: application/json' \
@@ -116,6 +118,22 @@ curl localhost:8080/api/notifications -H "Authorization: Bearer $TOKEN"
 Seeded SKUs: `SKU-KEYBOARD`, `SKU-MOUSE`, `SKU-MONITOR`, `SKU-HEADSET`, `SKU-LAPTOP`. The simulated payment provider declines charges above `PAYMENT_MAX_CHARGE` (default 5000.00), which makes it easy to trigger the compensation path.
 
 > `/auth/token` is a demo-only token issuer. In production, remove it and point the resource server at a real identity provider.
+
+## Configuration
+
+Each service reads its settings from environment variables, with defaults suited to running against the Docker Compose infrastructure from the host:
+
+| Variable | Used by | Default |
+|---|---|---|
+| `SERVER_PORT` | all | 8080 (gateway), 8081–8084 (services) |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | order, inventory, payment, notification | local Postgres, per-service database |
+| `KAFKA_BOOTSTRAP_SERVERS` | order, inventory, payment, notification | `localhost:29092` |
+| `PAYMENT_MAX_CHARGE` | payment | `5000.00` |
+| `REDIS_HOST`, `REDIS_PORT` | gateway | `localhost`, `6379` |
+| `JWT_SECRET` | gateway | dev-only key (override it outside local development) |
+| `JWT_TTL` | gateway | `PT1H` |
+| `RATE_LIMIT_REPLENISH`, `RATE_LIMIT_BURST` | gateway | `10`, `20` |
+| `ORDER_SERVICE_URL`, `INVENTORY_SERVICE_URL`, `PAYMENT_SERVICE_URL`, `NOTIFICATION_SERVICE_URL` | gateway | `http://localhost:8081` … `8084` |
 
 ## API
 
@@ -150,3 +168,7 @@ kubectl -n orderstream get pods
 ```
 
 Services use Spring Boot liveness/readiness probes, resource requests/limits and multiple replicas (safe thanks to `SKIP LOCKED` outbox relaying and Kafka consumer groups); the gateway has an HPA. The in-cluster Postgres/Kafka/Redis are single-node and meant for development; use managed services or operators (e.g. Strimzi) in production, and replace the dev secret.
+
+## License
+
+Released under the MIT License. See [LICENSE](LICENSE).
